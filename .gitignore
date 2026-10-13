@@ -1,0 +1,7 @@
+data/raw/
+data/db/
+data/datasets/
+results/
+.venv/
+__pycache__/
+*.py[cod]
