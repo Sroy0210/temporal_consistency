@@ -394,7 +394,7 @@ def ingest(repo, db, mode, since, until, paths, max_diff_chars, with_diffs, limi
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--repo", type=Path, default=Path("data/raw/linux"))
-    p.add_argument("--db", type=Path, default=Path("data/db/temporal.db"))
+    p.add_argument("--db", type=Path, default=Path("data/db/linux.db"))
     p.add_argument("--mode", choices=["first-parent", "no-merges"], default="no-merges")
     p.add_argument("--since", help="e.g. 2026-01-01")
     p.add_argument("--until")
