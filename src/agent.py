@@ -82,7 +82,11 @@ Rules:
   rejected, but M0 says it was applied), set status "premise_false" and cite the contradiction.
 - If the evidence does not answer the question, set status "not_in_evidence" and say what is missing
   in "unknowns". That is a correct answer, not a failure.
-- For yes/no questions set verdict "yes" or "no" with a supporting claim, or "unknown". Otherwise "n/a".
+- For yes/no questions the verdict must agree with your claims: "yes" or "no" with a supporting claim,
+  "unknown" only if no evidence item bears on it. Otherwise "n/a".
+  M0 lists everyone recorded on the patch. If a person appears in M0's Reviewed-by or Acked-by line,
+  the record shows them reviewing; if M0 lists those lines and the person is not in them, the record
+  does not show them reviewing, so the verdict is "no" (quote the line).
 - "summary": at most 3 sentences, restating only your claims.
 """
  
@@ -588,10 +592,16 @@ def evaluate(conn, args, backend) -> None:
                   f"future {r['future_cites']}  {r['seconds']}s", flush=True)
     report(conn, args)
  
- 
+def future_shown(conn, commit: str, evidence_ids: dict) -> int:
+    """How many evidence items put in front of the model were not yet visible to the decider."""
+    d = decision(conn, commit)
+    return sum(seen_time(conn, h, d["decider"]) > d["applied"] for i, h in evidence_ids.items() if i.startswith("E"))
+
+
 def report(conn, args) -> None:
     rows = conn.execute("""SELECT policy, loop, model, named, qtype, expected, status, verdict, claims, rejected,
-        leaks_raw, future_cites, seconds FROM agent_runs WHERE qtype IS NOT NULL ORDER BY model, loop, policy""").fetchall()
+        leaks_raw, future_cites, seconds, commit_hash, result_json FROM agent_runs WHERE qtype IS NOT NULL
+        ORDER BY model, loop, policy""").fetchall()
     if not rows:
         print("no evaluation runs yet")
         return
@@ -599,21 +609,24 @@ def report(conn, args) -> None:
     for r in rows:
         groups.setdefault(r[:4], []).append(r)
     pct = lambda a, b: f"{100 * a / b:.0f}% ({a}/{b})" if b else "-"
-    print(f"\n{'policy':6} {'loop':9} {'model':16} {'runs':>5}  {'quotes valid':>14}  {'future leak':>13}  "
-          f"{'presence right':>15}  {'fake premise caught':>19}  {'no evidence':>12}  {'avg s':>6}")
+    print(f"\n{'policy':6} {'loop':9} {'model':16} {'runs':>5}  {'future shown':>13}  {'quotes valid':>14}  "
+          f"{'cited future':>13}  {'future leak':>13}  {'presence right':>15}  {'fake premise caught':>19}  {'no evidence':>12}  {'avg s':>6}")
     for (pol, loop, model, named), rs in groups.items():
         kept, rej = sum(r[8] for r in rs), sum(r[9] for r in rs)
         fl = [r for r in rs if r[4] == "future_leak"]
         pr = [r for r in rs if r[4] == "presence"]
         fp = [r for r in rs if r[4] == "fake_premise"]
-        print(f"{pol:6} {loop:9} {(model + (' named' if named else ''))[:16]:16} {len(rs):>5}  "
-              f"{pct(kept, kept + rej):>14}  {pct(sum(r[10] > 0 or r[11] > 0 for r in fl), len(fl)):>13}  "
+        shown = sum(future_shown(conn, r[13], json.loads(r[14]).get("evidence_ids", {})) > 0 for r in rs)
+        print(f"{pol:6} {loop:9} {(model + (' named' if named else ''))[:16]:16} {len(rs):>5}  {pct(shown, len(rs)):>13}  "
+              f"{pct(kept, kept + rej):>14}  {pct(sum(r[11] > 0 for r in rs), len(rs)):>13}  "
+              f"{pct(sum(r[10] > 0 or r[11] > 0 for r in fl), len(fl)):>13}  "
               f"{pct(sum(r[7] == r[5] for r in pr), len(pr)):>15}  "
               f"{pct(sum(r[6] == 'premise_false' for r in fp), len(fp)):>19}  "
               f"{pct(sum(r[6] == 'not_in_evidence' for r in rs), len(rs)):>12}  {sum(r[12] for r in rs) / len(rs):6.1f}")
-    print("\nfuture leak = a later fix's hash or subject in the raw output, or a claim citing a patch the decider "
+    print("\nfuture shown = runs where the model was given at least one patch the decider could not yet have seen")
+    print("cited future = runs (any question type) with a claim citing a patch the decider could not yet have seen")
+    print("future leak = future_leak questions only: a later fix's hash or subject in the raw output, or a claim citing a patch the decider "
           "could not yet have seen")
- 
  
 # ---------------------------------------------------------------- self-test (no model)
  

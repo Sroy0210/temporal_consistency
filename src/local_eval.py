@@ -109,12 +109,12 @@ def questions(conn, out: Path) -> None:
         if reviewers:
             r = rnd.choice(sorted(reviewers))
             qs.append(dict(type="presence", commit=h, t=t, actor=r, answer="yes",
-                           question=f"Did P{r:03d} review '{d['subject']}' before it was applied?"))
+                           question=f"Does the record show P{r:03d} reviewing or acking '{d['subject']}' before it was applied?"))
             others = [a for a in actors if a not in reviewers and a != d["decider"]]
             if others:
                 o = rnd.choice(others)
                 qs.append(dict(type="presence", commit=h, t=t, actor=o, answer="no",
-                               question=f"Did P{o:03d} review '{d['subject']}' before it was applied?"))
+                               question=f"Does the record show P{o:03d} reviewing or acking '{d['subject']}' before it was applied?"))
         qs.append(dict(type="fake_premise", commit=h, t=t, answer="it was applied, not rejected",
                        question=f"Why did the maintainer reject the patch '{d['subject']}'?"))
     out.parent.mkdir(parents=True, exist_ok=True)
