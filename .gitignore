@@ -2,6 +2,7 @@ data/raw/
 data/db/
 data/datasets/
 results/
+eval/
 .venv/
 __pycache__/
 *.py[cod]
