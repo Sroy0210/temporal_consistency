@@ -1,8 +1,16 @@
-data/raw/
-data/db/
-data/datasets/
-results/
+# generated data: database, clone, prepared answers, evaluation questions
+data/
 eval/
-.venv/
+
+# frontend build output and dependencies
+web/node_modules/
+web/dist/
+
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
+.venv/
+
+# secrets: the Gemini key must never be committed
+.env
+*.env

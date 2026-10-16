@@ -76,9 +76,10 @@ def build(conn: sqlite3.Connection) -> None:
               AND t.kind IN ({','.join('?' * len(PARTICIPANT_KINDS))})""", PARTICIPANT_KINDS):
         links.append((h, see(email, name), kind))
  
-    for email, counts in names.items():
-        best = max(counts, key=counts.get) if counts else None
-        conn.execute("INSERT INTO actors(email, name) VALUES (?,?)", (email, best))
+    for email in sorted(names):
+        counts = names[email]
+        best = max(sorted(counts), key=counts.get) if counts else None
+        conn.execute("INSERT INTO actors (email, name) VALUES (?,?)", (email, best))
     ids = dict(conn.execute("SELECT email, actor_id FROM actors"))
     conn.executemany("INSERT OR IGNORE INTO participation VALUES (?,?,?)",
                      [(h, ids[e], r) for h, e, r in links if e])
