@@ -62,9 +62,9 @@ python src/ingest.py --repo data/raw/linux --since 2026-01-01 --path fs/ext4 --d
 
 - Takes under a minute with diffs. `--no-diffs` makes it faster.
 - Expect a summary with the commit count and "Fixes: tags resolved to commits in the DB".
-- The README's results come from a database of 287 decisions. `--since 2026-01-01` on a
-  fresh clone gave 233; use the same `--since` as the results database if you want
-  identical numbers (the retrieval percentages were the same for both).
+- The README's results come from a fresh clone on 18 Oct 2026: 234 decisions, 113 people,
+  7 decisions with a later fix inside the window. A later clone will have more commits; the
+  retrieval percentages were the same on 233, 234 and 287 decisions.
 - `--reset` rebuilds a database made by an older version of the ingester
   (the error "no such column repo_id" means you need it).
 
@@ -194,8 +194,10 @@ python src/agent.py report
 ```
 
 - Gemini runs the prefetch loop only for now.
-- **The free tier allows 20 requests per day per model.** An answer that needs a retry uses
-  two, so one evaluation pass may take more than a day. Saved runs are skipped, so re-run the
+- **Free-tier limits are per model** (check ai.dev/rate-limit): most Flash models allow 5
+  requests per minute and 20 per day; Gemini 3.5 Flash Lite allowed 15 per minute and 500 per
+  day, which is why the site's 64 prepared answers use it. An answer that needs a retry uses
+  two requests, so one evaluation pass on a 20-a-day model may take more than a day. Saved runs are skipped, so re-run the
   same `eval` command the next day and it continues.
 - `503 UNAVAILABLE` means the model is briefly overloaded; re-run. `429 RESOURCE_EXHAUSTED`
   means the daily quota is used up.
@@ -308,13 +310,12 @@ evidence".
 | no evidence | Answers with status `not_in_evidence` | Honest abstention; too high means retrieval is missing evidence |
 | avg s | Mean seconds per answer | Hardware and loop dependent |
 
-**How to read the current results:** exposure (future shown 89% on Gemma and 100% on Gemini
-for B1, 0% for B3 on both) is the retrieval boundary at work and is large enough to read even
-at 8 or 9 runs per policy. Use (cited future) is much smaller, because simple questions are
-answered from the patch message itself; the one B1 citation on Gemma produced a wrong answer,
-which is the failure the information set prevents. Reviewer questions: Gemma got 1 of 3 under
-each policy; Gemini got all 7 right. The remaining columns are smoke tests at 3 to 5
-questions per type.
+**How to read the current results:** exposure (future shown) is 100% without the boundary and
+0% with the information set on all three models (Gemini 3.8 Flash, Gemini 3.5 Flash Lite,
+Gemma 4 E4B); that is the retrieval boundary at work and is large enough to read at 8 or 9
+runs per policy. Use (cited future) was 0 everywhere, because simple questions are answered
+from the patch message itself. Reviewer questions: both Gemini models 3/3 under each policy,
+Gemma 1/3. The remaining columns are smoke tests at 3 questions per type.
 
 ### Why your numbers may differ slightly
 

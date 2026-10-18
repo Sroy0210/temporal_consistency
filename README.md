@@ -8,10 +8,11 @@ Temporal Consistency reconstructs each decider's **information set** at the mome
 decision and answers from that evidence alone. Every claim is quoted word for word from its
 source, and what happened later is shown separately, as hindsight.
 
-The first dataset is the Linux kernel's ext4 filesystem history (287 decisions), where every
+The first dataset is the Linux kernel's ext4 filesystem history (234 decisions, Jan–Oct 2026), where every
 event has an exact time, a named author and written reasoning.
 
-**Live demo:** https://software-history-tracker.web.app
+**Live demo:** https://software-history-tracker.web.app (9 decisions with prepared answers
+from Gemini 3.5 Flash Lite)
 
 ---
 
@@ -22,7 +23,7 @@ A patch applied on 23 Jan 2026 added kunit tests for the ext4 extent status cach
 patch was applied and it can mix in the March fix, which the maintainer who applied it never
 had. That's unfair to the people who decided, and it makes the explanation wrong.
 
-The obvious fix, a date cutoff, doesn't work either. Measured on all 287 decisions with no
+The obvious fix, a date cutoff, doesn't work either. Measured on all 234 decisions with no
 model involved, the share of decisions that would be handed at least one patch the decider
 could not yet have seen:
 
@@ -34,7 +35,8 @@ could not yet have seen:
 | **Information set** | **0%** |
 
 Kernel patches are often written weeks before they are applied, so an author-date cutoff
-admits patches nobody outside the author had seen yet.
+admits patches nobody outside the author had seen yet. The same four percentages came out on
+three different windows of the history (233, 234 and 287 decisions).
 
 ## How it works
 
@@ -76,7 +78,7 @@ Git history ─► ingest.py ─► SQLite ─► ledger.py ─► extract.py (G
 ## Features
 
 - **Decision records:** problem, change and stated reason extracted from each patch as quotes
-  (1,255 quotes over 287 decisions, 99% verbatim).
+  (1,052 quotes over 234 decisions, 99% verbatim).
 - **Timeline:** what the decider had seen is lit; later events stay in fog until you drag past them.
 - **Same question, two answers:** the bounded answer beside one with no boundary, with future
   evidence marked in red.
@@ -86,25 +88,36 @@ Git history ─► ingest.py ─► SQLite ─► ledger.py ─► extract.py (G
 
 ## Results
 
-The full agent on the same questions, with and without the boundary (prefetch loop):
+The full agent on the same questions, with and without the boundary (prefetch loop, 234 decisions):
 
-| Evidence allowed | Model | Runs | Shown a future patch | Quotes verified | Reviewer questions right |
-|---|---|---|---|---|---|
-| No boundary | Gemini 3.8 Flash | 9 | 100% | 100% | 4 of 4 |
-| **Information set** | Gemini 3.8 Flash | 8 | **0%** | 100% | 3 of 3 |
-| No boundary | Gemma 4 E4B | 9 | 89% | 100% | 1 of 3 |
-| **Information set** | Gemma 4 E4B | 9 | **0%** | 100% | 1 of 3 |
+| Evidence allowed | Model | Runs | Shown a future patch | Quotes verified | Reviewer questions right | False premises caught |
+|---|---|---|---|---|---|---|
+| No boundary | Gemini 3.8 Flash | 9 | 100% | 100% | 3 of 3 | 3 of 3 |
+| **Information set** | Gemini 3.8 Flash | 8 | **0%** | 100% | 3 of 3 | 2 of 2 |
+| No boundary | Gemini 3.5 Flash Lite | 8 | 100% | 100% | 3 of 3 | 2 of 2 |
+| **Information set** | Gemini 3.5 Flash Lite | 8 | **0%** | 100% | 3 of 3 | 2 of 2 |
+| No boundary | Gemma 4 E4B | 9 | 100% | 100% | 1 of 3 | 3 of 3 |
+| **Information set** | Gemma 4 E4B | 9 | **0%** | 100% | 1 of 3 | 3 of 3 |
 
-- The exposure column measures the boundary itself and is large enough to read at this sample size.
-- In one Gemma run without the boundary, the model quoted a *later* patch's `Reviewed-by`
-  line and gave the wrong verdict; with the boundary it answered correctly from the
-  decision's own record.
-- False premises caught by Gemma: 3 of 3 with the boundary. Not run on Gemini because of the
-  free-tier quota.
-- Model-free checks: the ledger self-test finds 0 leaks across every decision.
+- **Exposure is the headline.** Without the boundary, every run was handed at least one patch
+  the decider could not yet have seen, sometimes the decision's own later fix. With the
+  information set, none was. This holds on all three models, because code enforces it.
+- **The boundary costs nothing in quality.** Quotes, reviewer questions and false premises are
+  the same with and without it.
+- **Model size matters for yes/no questions.** Both Gemini models answered every reviewer
+  question correctly; Gemma, a 4B model, got one in three.
+- **No run cited future evidence.** Simple questions are answered from the patch message
+  itself, so the models did not need later material. Harder questions are needed to measure
+  how often a model *uses* future evidence it is given; the boundary makes that question moot.
 
-Samples are small (3 to 5 questions per type). [REPRODUCE.md](REPRODUCE.md) explains every
-number and how to get it.
+**Extraction** (Gemma 4 E4B, all 234 decisions): 1,038 of 1,052 quotes verbatim (99%),
+15 decisions needed a retry, 261 duplicate items resolved in code, a stated reason found in
+232 of 234 decisions.
+
+**Model-free checks:** the ledger self-test finds 0 leaks across every decision.
+
+Samples are small (3 questions per type per policy). [REPRODUCE.md](REPRODUCE.md) explains
+every number and how to get it.
 
 ## Quick start
 
@@ -179,7 +192,7 @@ REPRODUCE.md            Step-by-step reproduction and what each number means
 
 ## Tech stack
 
-- **Models:** Gemini 3.8 Flash through Google AI Studio (`google-genai`); Gemma 4 E4B, local through Ollama
+- **Models:** Gemini 3.8 Flash and Gemini 3.5 Flash Lite through Google AI Studio (`google-genai`); Gemma 4 E4B, local through Ollama
 - **Data:** Git, SQLite, Python standard library
 - **Backend:** FastAPI, Uvicorn
 - **Frontend:** React 18, Vite 6
@@ -193,7 +206,9 @@ REPRODUCE.md            Step-by-step reproduction and what each number means
   ledger only credits them from the applied date.
 - **People are identified by email address.** One person with several addresses counts as
   several people; addresses are not merged yet.
-- **Small evaluation samples**, limited by the Gemini free tier (20 requests per day per model).
+- **Small evaluation samples**, limited by the Gemini free tier (20 requests per day for most
+  models). The site's prepared answers use Gemini 3.5 Flash Lite, whose daily limit is higher;
+  its answers are shorter than 3.8 Flash's.
 - **The tools loop needs a capable model.** Gemma answered without calling its tools, so the
   local default is the prefetch loop, where code makes the same bounded lookups. The tools
   loop on Gemini is not wired yet.

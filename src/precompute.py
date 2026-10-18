@@ -166,6 +166,7 @@ def main():
     p.add_argument("--model")
     p.add_argument("--host", default=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
     p.add_argument("--redo", action="store_true", help="answer again even if an answer is saved")
+    p.add_argument("--only", action="append", default=[], help="limit the showcase to these commits; repeatable")
     a = p.parse_args()
     conn = sqlite3.connect(a.db, timeout=30)
     out = Path(a.out)
@@ -178,6 +179,8 @@ def main():
         return
 
     cases = showcase(conn, a.commit)
+    if a.only:
+        cases = [c for c in cases if any(c["commit"].startswith(x) for x in a.only)]
     if a.action == "list":
         for c in cases:
             print(f"{c['commit'][:12]}  {'later fixed  ' if c['later_fixed'] else 'no prior work'}  {c['subject'][:60]}")
@@ -196,6 +199,8 @@ def main():
         k = demo_key(c["commit"], pol, a.loop, q)
         if k in saved["items"] and not a.redo:
             continue
+        if a.backend == "gemini":
+            time.sleep(13)
         try:
             r = answer(conn, c["commit"], q, backend, pol, a.loop, anon=anon)
         except ConnectionError as e:
