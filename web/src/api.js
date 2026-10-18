@@ -11,14 +11,38 @@ async function handle(res) {
   throw new Error(detail);
 }
 
-export const getJSON = (path) => fetch(path).then(handle);
+// Static mode (npm run build:static): the site reads exported files instead of calling the server.
+const STATIC = import.meta.env.VITE_STATIC === "1";
+const BASE = import.meta.env.BASE_URL;
 
-export const postJSON = (path, body) =>
-  fetch(path, {
+function staticFile(path) {
+  if (path === "/api/status") return "data/status.json";
+  if (path === "/api/decisions") return "data/decisions.json";
+  if (path === "/api/results") return "data/results.json";
+  const d = path.match(/^\/api\/decision\/([0-9a-f]+)$/);
+  if (d) return `data/decision/${d[1]}.json`;
+  const a = path.match(/^\/api\/answers\/([0-9a-f]+)$/);
+  if (a) return `data/answers/${a[1]}.json`;
+  throw new Error(`No static file for ${path}`);
+}
+
+export const getJSON = (path) => fetch(STATIC ? BASE + staticFile(path) : path).then(handle);
+
+export async function postJSON(path, body) {
+  if (STATIC) {
+    const all = await fetch(BASE + staticFile(`/api/answers/${body.commit}`))
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({}));
+    const pair = all[body.question.trim()];
+    if (!pair) throw new Error("This copy of the site answers the prepared questions only.");
+    return path === "/api/compare" ? pair : pair[body.policy || "B3"];
+  }
+  return fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }).then(handle);
+}
 
 export const shortHash = (h) => (h || "").slice(0, 12);
 

@@ -14,3 +14,6 @@ __pycache__/
 # secrets: the Gemini key must never be committed
 .env
 *.env
+
+# firebase caches
+.firebase/
